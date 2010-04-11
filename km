@@ -1,0 +1,128 @@
+#!/usr/bin/python
+
+import os
+import termios
+from optparse import *
+
+from MK import *
+
+
+parser = OptionParser()
+parser.add_option("-d", "--device", metavar="DEV",
+        help="Device to connect to MK (e.g. /dev/usbserial-*)")
+parser.set_default('device', "/dev/cu.usbserial-A600cnVE")
+parser.add_option("--info", action='store_true',
+        help="Display status/version information about MK")
+parser.add_option("--show-settings", action='store_true',
+        help="show settings")
+parser.add_option("--select",
+        help="select FC, NC, MK3Mag, or MKGPS")
+parser.add_option("--load-mixer", metavar="MKM",
+        help="Load mixer configuration from .mkm file")
+
+(options, args) = parser.parse_args()
+
+
+link = connect(options.device)
+
+# end sio redirection
+#link.write("#" + chr(0x1b) + chr(0x1b) + chr(0x55) + chr(0xaa) + chr(0) + '\r')
+
+#send_packet(link, 'a', 'v', [])
+#send_packet(link, 'a', 'a', [0])
+#send_packet(link, 'c', 'u', [0]) # select FC
+#send_packet(link, 'b', 'n', [0])
+#send_packet(link, 'b', 'm', [1] + encode_str("Hexa", 12) +
+#        [64, 64, 0, 64] +
+#        [64, 32, -64, -64] +
+#        [64, -32, -64, 64] +
+#        [64, -64, 0, -64] +
+#        [64, -32, 64, 64] +
+#        [64, 32, 64, -64] +
+#        [0,0,0,0] + [0,0,0,0] + [0,0,0,0] +
+#        [0,0,0,0] + [0,0,0,0] + [0,0,0,0])
+
+#send_packet(link, 'c', 'v', [])
+#send_packet(link, 'c', 'o', [100])
+#send_packet(link, 'c', 'z', [123, 45])
+#send_packet(link, 'c', 'u', [2]) # select MKGPS
+
+#send_packet(link, 'c', 'u', [0]) # select FC
+#send_packet(link, 'b', 'q', [0xff])
+
+if options.info:
+    send_packet(link, 'a', 'v', [])
+
+if options.select == "FC":
+    send_packet(link, 'c', 'u', [0])
+elif options.select == "MK3Mag":
+    send_packet(link, 'c', 'u', [1])
+elif options.select == "MKGPS":
+    send_packet(link, 'c', 'u', [2])
+elif options.select == "NC":
+    link.write("#" + chr(0x1b) + chr(0x1b) +
+               chr(0x55) + chr(0xaa) + chr(0) + '\r')
+elif options.select != None:
+    parser.error("invalid --select value")
+    
+if options.show_settings:
+    send_packet(link, 'b', 'q', [0xff])
+
+
+
+if options.load_mixer:
+    with open(options.load_mixer, "rt") as mkm:
+        section = None
+        data = [0] * 12 * 4
+        for line in mkm:
+            line = line.strip()
+            if line[0] == '[' and line[-1] == ']':
+                section = line[1:-1]
+                continue
+            else:
+                (key,value) = line.split('=')
+
+            if section == "Info" and key == "Name":
+                name = value
+                continue
+            elif section == "Info" and key == "Version":
+                if value != "1":
+                    parser.error("Don't know how to handle MKM version %s!" % value)
+                continue
+            elif key[:5] != "Motor":
+                parser.error("Invalid MKM key %s in section %s!" % (key, section))
+
+            motor = int(key[5:])
+            value = int(value)
+            index = (motor-1) * 4
+            nick = roll = yaw = 0
+            if section == "Gas":
+                index += 0
+            elif section == "Nick":
+                index += 1
+                nick += value
+            elif section == "Roll":
+                index += 2
+                roll += value
+            elif section == "Yaw":
+                index += 3
+                yaw += value
+            else:
+                print "unknown section %s!" % section
+                continue
+
+            data[index] = value
+
+    # check value
+    if nick != 0:
+        raise "Nick values not balanced!"
+    if roll != 0:
+        raise "Roll values not balanced!"
+    if yaw != 0:
+        raise "Yaw values not balanced!"
+
+    send_packet(link, 'b', 'm', [1] + encode_str(name, 12) + data)
+
+
+
+receive(link)
