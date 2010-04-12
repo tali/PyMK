@@ -5,6 +5,7 @@ import termios
 from optparse import *
 
 from MK import *
+from ubx import *
 
 
 parser = OptionParser()
@@ -19,6 +20,8 @@ parser.add_option("--select",
         help="select FC, NC, MK3Mag, or MKGPS")
 parser.add_option("--load-mixer", metavar="MKM",
         help="Load mixer configuration from .mkm file")
+parser.add_option("--gps", action='store_true',
+        help="log GPS data")
 
 (options, args) = parser.parse_args()
 
@@ -124,5 +127,13 @@ if options.load_mixer:
     send_packet(link, 'b', 'm', [1] + encode_str(name, 12) + data)
 
 
+if options.gps:
+    send_packet(link, 'c', 'u', [2])
+    ubx = UBX()
+    while True:
+        data = link.read(1)
+        ubx.parse(ord(data[0]))
+    link.write("#" + chr(0x1b) + chr(0x1b) +
+               chr(0x55) + chr(0xaa) + chr(0) + '\r')
 
 receive(link)
