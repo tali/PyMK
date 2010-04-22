@@ -16,8 +16,14 @@ parser.add_option("-d", "--device", metavar="DEV",
 parser.set_default('device', "/dev/cu.MikroKopter_BT-SerialPo")
 parser.add_option("--info", action='store_true',
         help="Display status/version information about MK")
-parser.add_option("--show-settings", action='store_true',
+parser.add_option("--monitor", action='store_true',
+        help="Display analog values")
+parser.add_option("--show-settings", metavar="INDEX",
         help="show settings")
+parser.add_option("--get", metavar="KEY",
+        help="request a setting")
+parser.add_option("--set", metavar="KEY=VALUE",
+        help="change a setting")
 parser.add_option("--show-mixer", action='store_true',
         help="show motor mixer settings")
 parser.add_option("--load-mixer", metavar="MKM",
@@ -51,16 +57,46 @@ if options.info:
     if reply:
         print "MK3Mag", reply
 
-#    for index in range(0, 10):
-#        cmd = CmdAnalogLabel(mk.fc, index)
-#        reply = mk.send_cmd(cmd)
-#        print "label", index, reply
+if options.monitor:
+    label = []
+    board = mk.mk3mag
+    for index in range(0, 32):
+        cmd = CmdAnalogLabel(board, index)
+        reply = mk.send_cmd(cmd)
+        label.append( reply )
 
+    cmd = CmdGetAnalog(board, 100)
+    reply = mk.send_cmd(cmd)
+    for label, value in zip( label, reply[1:] ):
+        print "%15s %d" % (label, value)
+    cmd = CmdGetAnalog(board, 0)
+    reply = mk.send_cmd(cmd)
 
 if options.show_settings:
+    if options.show_settings == "-":
+        index = 0xff
+    else:
+        index = int(options.show_settings)
+    cmd = CmdGetSettings(mk.fc, index)
+    set, version, data = mk.send_cmd(cmd)
+    print "settings", set, "version", version
+    print sorted(data)
+
+if options.get:
     cmd = CmdGetSettings(mk.fc, 0xff)
     set, version, data = mk.send_cmd(cmd)
-    print "settings", set, "version", version, data
+    print data[options.get]
+
+if options.set:
+    key, value = options.set.split('=')
+    value = int(value)
+    cmd = CmdGetSettings(mk.fc, 0xff)
+    set, version, data = mk.send_cmd(cmd)
+    data[key] = value
+    cmd = CmdSetSettings(mk.fc, set, version, data)
+    status = mk.send_cmd(cmd)
+    if status != set:
+        print "cannot set %s to %d (setting %d)" % (key, value, set)
 
 
 if options.load_mixer:

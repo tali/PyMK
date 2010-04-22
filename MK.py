@@ -234,13 +234,19 @@ class CmdVersion(Command):
         return "%d.%d%s" % ( major, minor, chr( ord('a') + patch) )
 
 class CmdAnalogLabel(Command):
-
     def __init__(self, board, index):
         Command.__init__(self, board, 'a', 'A', struct.pack('B', index))
 
     def parse_reply(self, reply):
-        index, name = struct.unpack("B 16s 2x", reply)
-        return index, name
+        index, name = struct.unpack("B 16s x", reply)
+        return name
+
+class CmdGetAnalog(Command):
+    def __init__(self, board, interval):
+        Command.__init__(self, board, 'd', 'D', struct.pack('B', interval))
+
+    def parse_reply(self, reply):
+        return struct.unpack("33h", reply)
 
 class CmdGetSettings(Command):
     def __init__(self, board, index):
@@ -254,6 +260,17 @@ class CmdGetSettings(Command):
             setting[name], = struct.unpack('B', reply[0])
             reply = reply[1:]
         return set, version, setting
+
+class CmdSetSettings(Command):
+    def __init__(self, board, set, version, setting):
+        data = struct.pack("2B", set, version)
+        for name in settings:
+            data += struct.pack("B", setting[name])
+        Command.__init__(self, board, 's', 'S', data)
+
+    def parse_reply(self, reply):
+        set, = struct.unpack("Bxx", reply)
+        return set
 
 class CmdGetChannels(Command):
     def __init__(self, board):
