@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import asyncore
 import os
 import termios
 from optparse import *
@@ -11,66 +12,52 @@ from ubx import *
 parser = OptionParser()
 parser.add_option("-d", "--device", metavar="DEV",
         help="Device to connect to MK (e.g. /dev/usbserial-*)")
-parser.set_default('device', "/dev/cu.usbserial-A600cnVE")
+#parser.set_default('device', "/dev/cu.usbserial-A600cnVE")
+parser.set_default('device', "/dev/cu.MikroKopter_BT-SerialPo")
 parser.add_option("--info", action='store_true',
         help="Display status/version information about MK")
 parser.add_option("--show-settings", action='store_true',
         help="show settings")
-parser.add_option("--select",
-        help="select FC, NC, MK3Mag, or MKGPS")
+parser.add_option("--show-mixer", action='store_true',
+        help="show motor mixer settings")
 parser.add_option("--load-mixer", metavar="MKM",
         help="Load mixer configuration from .mkm file")
-parser.add_option("--gps", action='store_true',
-        help="log GPS data")
+#parser.add_option("--gps", action='store_true',
+#        help="log GPS data")
+parser.add_option("--channels", action='store_true',
+        help="show channels")
+#parser.add_option("--debug", action='store_true',
+#        help="")
 
 (options, args) = parser.parse_args()
 
 
-link = connect(options.device)
-
-# end sio redirection
-#link.write("#" + chr(0x1b) + chr(0x1b) + chr(0x55) + chr(0xaa) + chr(0) + '\r')
-
-#send_packet(link, 'a', 'v', [])
-#send_packet(link, 'a', 'a', [0])
-#send_packet(link, 'c', 'u', [0]) # select FC
-#send_packet(link, 'b', 'n', [0])
-#send_packet(link, 'b', 'm', [1] + encode_str("Hexa", 12) +
-#        [64, 64, 0, 64] +
-#        [64, 32, -64, -64] +
-#        [64, -32, -64, 64] +
-#        [64, -64, 0, -64] +
-#        [64, -32, 64, 64] +
-#        [64, 32, 64, -64] +
-#        [0,0,0,0] + [0,0,0,0] + [0,0,0,0] +
-#        [0,0,0,0] + [0,0,0,0] + [0,0,0,0])
-
-#send_packet(link, 'c', 'v', [])
-#send_packet(link, 'c', 'o', [100])
-#send_packet(link, 'c', 'z', [123, 45])
-#send_packet(link, 'c', 'u', [2]) # select MKGPS
-
-#send_packet(link, 'c', 'u', [0]) # select FC
-#send_packet(link, 'b', 'q', [0xff])
+mk = MK(options.device)
 
 if options.info:
-    send_packet(link, 'a', 'v', [])
+    cmd = CmdVersion(mk.fc)
+    reply = mk.send_cmd(cmd)
+    if reply:
+        print "FlightCtrl", reply
+    cmd = CmdVersion(mk.nc)
+    reply = mk.send_cmd(cmd)
+    if reply:
+        print "NaviCtrl", reply
+    cmd = CmdVersion(mk.mk3mag)
+    reply = mk.send_cmd(cmd)
+    if reply:
+        print "MK3Mag", reply
 
-if options.select == "FC":
-    send_packet(link, 'c', 'u', [0])
-elif options.select == "MK3Mag":
-    send_packet(link, 'c', 'u', [1])
-elif options.select == "MKGPS":
-    send_packet(link, 'c', 'u', [2])
-elif options.select == "NC":
-    link.write("#" + chr(0x1b) + chr(0x1b) +
-               chr(0x55) + chr(0xaa) + chr(0) + '\r')
-elif options.select != None:
-    parser.error("invalid --select value")
-    
+#    for index in range(0, 10):
+#        cmd = CmdAnalogLabel(mk.fc, index)
+#        reply = mk.send_cmd(cmd)
+#        print "label", index, reply
+
+
 if options.show_settings:
-    send_packet(link, 'b', 'q', [0xff])
-
+    cmd = CmdGetSettings(mk.fc, 0xff)
+    set, version, data = mk.send_cmd(cmd)
+    print "settings", set, "version", version, data
 
 
 if options.load_mixer:
@@ -124,16 +111,37 @@ if options.load_mixer:
     if yaw != 0:
         raise "Yaw values not balanced!"
 
-    send_packet(link, 'b', 'm', [1] + encode_str(name, 12) + data)
+    cmd = CmdSetMotorMixer(mk.fc, name, data)
+    reply = mk.send_cmd(cmd)
+    if reply != 1:
+        print "ERROR setting motor mixer"
+
+if options.show_mixer:
+    cmd = CmdGetMotorMixer(mk.fc)
+    name, table = mk.send_cmd(cmd)
+    print "Mixer", name
+    print "Motor", "Gas", "Nick", "Roll", "Yaw"
+    motor = 1
+    while table[0]:
+        print motor, table[0], table[1], table[2], table[3]
+        table = table[4:]
+        motor += 1
 
 
-if options.gps:
-    send_packet(link, 'c', 'u', [2])
-    ubx = UBX()
+
+
+#if options.gps:
+#    send_packet(link, 'c', 'u', [2])
+#    ubx = UBX()
+#    while True:
+#        data = link.read(1)
+#        ubx.parse(ord(data[0]))
+#    link.write("#" + chr(0x1b) + chr(0x1b) +
+#               chr(0x55) + chr(0xaa) + chr(0) + '\r')
+
+if options.channels:
     while True:
-        data = link.read(1)
-        ubx.parse(ord(data[0]))
-    link.write("#" + chr(0x1b) + chr(0x1b) +
-               chr(0x55) + chr(0xaa) + chr(0) + '\r')
+        cmd = CmdGetChannels(mk.fc)
+        reply = mk.send_cmd(cmd)
+        print "channels", reply
 
-receive(link)
