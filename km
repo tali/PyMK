@@ -122,7 +122,7 @@ if options.show_mixer:
     print "Mixer", name
     print "Motor", "Gas", "Nick", "Roll", "Yaw"
     motor = 1
-    while table[0]:
+    while len(table) >= 4:
         print motor, table[0], table[1], table[2], table[3]
         table = table[4:]
         motor += 1

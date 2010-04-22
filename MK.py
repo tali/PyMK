@@ -120,9 +120,10 @@ def calc_crc(data):
 
     return chr( _zero + counter/64 ) + chr( _zero + counter%64 )
 
+triplet = struct.Struct('BBB')
 
 def decode(code):
-    data = []
+    data = ""
     while len(code) >= 4:
         a = ord(code[0]) - _zero
         b = ord(code[1]) - _zero
@@ -132,22 +133,16 @@ def decode(code):
         x = ((a & 0x3f) << 2) | ((b & 0xf0) >> 4)
         y = ((b & 0x0f) << 4) | ((c & 0xfc) >> 2)
         z = ((c & 0x03) << 6) |  (d & 0x3f)
-        if x > 127: x -= 256
-        if y > 127: y -= 256
-        if z > 127: z -= 256
 
-        data += [x, y, z]
+        data += triplet.pack(x, y, z)
         code = code[4:]
     return data
 
 def encode(data):
     code = ""
     while len(data):
-        while len(data)<3: data.append(0)
-        (x, y, z) = data[0:3]
-        if x < 0: x += 256
-        if y < 0: y += 256
-        if z < 0: z += 256
+        while len(data)<3: data += chr(0)
+        (x, y, z) = triplet.unpack(data[:3])
 
         a = (x & 0xfc) >> 2
         b = ((x & 0x03) << 4) | ((y & 0xf0) >> 4)
@@ -166,19 +161,13 @@ def encode(data):
 def decode_str(data):
     s = ""
     for c in data:
-        if not c: break
-        s += chr(c)
+        if not ord(c): break
+        s += c
     return s.strip()
 
 def encode_str(s, l):
-    data = []
-    for c in s:
-        data.append( ord(c) )
-        l -= 1
-    while l:
-        data.append( 0 )
-        l -= 1
-    return data
+    while len(s)<l: s.append(0)
+    return s
 
 
 
@@ -236,54 +225,64 @@ class CmdVersion(Command):
         Command.__init__(self, board, 'v', 'V', [])
 
     def parse_reply(self, reply):
-        return "%d.%d%s" % ( reply[0], reply[1], chr( ord('a')+ reply[4]) )
+        major, minor, patch = struct.unpack("BBxxBx")
+        return "%d.%d%s" % ( major, minor, chr( ord('a') + patch) )
 
 class CmdAnalogLabel(Command):
+
     def __init__(self, board, index):
-        Command.__init__(self, board, 'a', 'A', [index])
+        Command.__init__(self, board, 'a', 'A', struct.pack('B', index))
 
     def parse_reply(self, reply):
-        return reply[0], decode_str(reply[1:])
+        index, name = struct.unpack("B 16s 2x", reply)
+        return index, name
 
 class CmdGetSettings(Command):
     def __init__(self, board, index):
-        Command.__init__(self, board, 'q', 'Q', [0xff])
+        Command.__init__(self, board, 'q', 'Q', struct.pack('B', index))
 
     def parse_reply(self, reply):
-        return reply[0], reply[1], reply[2:]
-#        print "Settings", data[0], "Version", data[1]
-#        settings = {}
-#        for (name, value) in zip(settings, data[2:]):
-#            unsigned = value
-#            if unsigned < 0: unsigned += 256
-#
-#            print "%25s: %4d  0x%02x" % (name, value, unsigned)
+        set, version = struct.unpack("2B", reply[0:2])
+        reply = reply[2:]
+        setting = {}
+        for name in settings:
+            setting[name], = struct.unpack('B', reply[0])
+            reply = reply[1:]
+        return set, version, setting
 
 class CmdGetChannels(Command):
     def __init__(self, board):
-        Command.__init__(self, board, 'p', 'P', [])
+        Command.__init__(self, board, 'p', 'P', "")
 
     def parse_reply(self, reply):
-        return struct.unpack("hhhhhhh", map(chr,reply[:14]))
+        return struct.unpack("8h", reply[:16])
 
 
 class CmdSetMotorMixer(Command):
     def __init__(self, board, name, data):
-        payload = [1] + encode_str(name, 12) + data
+        payload = struct.pack("B 12s", 1, name)
+        for d in data:
+            payload += struct.pack("b", d)
         Command.__init__(self, board, 'm', 'M', payload)
 
     def parse_reply(self, reply):
-        return reply[0]
+        status = struct.unpack("B 2x", reply)
+        return status
 
 
 class CmdGetMotorMixer(Command):
     def __init__(self, board):
-        Command.__init__(self, board, 'n', 'N', [])
+        Command.__init__(self, board, 'n', 'N', "")
 
     def parse_reply(self, reply):
-        if reply[0] != 1:
+        rev, name = struct.unpack("B 12s", reply[:13])
+        if rev != 1:
             raise "Unknown mixer revision"
-        return decode_str(reply[1:13]), reply[13:]
+        reply = reply[13:]
+        data = []
+        while len(reply) >= 4:
+            data += struct.unpack("4b", reply[:4])
+        return name, data
 
 
 class MK(object):
@@ -356,6 +355,9 @@ class MK(object):
             if r_addr == board.addr and r_id == id:
                 return r_data
             else:
+                if r_addr == 'd' and r_id == 'w':
+                    # ignore heading requests
+                    continue
                 print "unexpected packet", r_addr, r_id, r_data
         return None
 
@@ -378,7 +380,8 @@ class MK(object):
         self.send_data(escape, 0.1)
 
         if board.redirect != None:
-            redirect = Command(self.nc, 'u', None, [board.redirect])
+            
+            redirect = Command(self.nc, 'u', None, struct.pack('B', board.redirect))
             self.send_data(redirect.get_frame(), 0.1)
 
         self.selected = board
