@@ -9,17 +9,6 @@ import time
 
 _zero = ord('=')
 
-def board_name(addr):
-    if addr == "a":
-        return "<any>"
-    if addr == "b":
-        return "FlightCtrl"
-    if addr == "c":
-        return "NaviCtrl"
-    if addr == "d":
-        return "MK3Mag"
-    return "<unknown>"
-
 
 settings = [
     "Channel_Gas", "Channel_Gier", "Channel_Nick", "Channel_Roll",
@@ -156,18 +145,6 @@ def encode(data):
         data = data[3:]
 
     return code
-
-
-def decode_str(data):
-    s = ""
-    for c in data:
-        if not ord(c): break
-        s += c
-    return s.strip()
-
-def encode_str(s, l):
-    while len(s)<l: s.append(0)
-    return s
 
 
 
