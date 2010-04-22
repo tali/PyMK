@@ -227,11 +227,15 @@ class CmdRedirect(Command):
 
 class CmdVersion(Command):
     def __init__(self, board):
-        Command.__init__(self, board, 'v', 'V', [])
+        Command.__init__(self, board, 'v', 'V', "")
 
     def parse_reply(self, reply):
         major, minor, patch = struct.unpack("BBxxBx6x", reply)
         return "%d.%d%s" % ( major, minor, chr( ord('a') + patch) )
+
+class CmdErrorMsg(Command):
+    def __init__(self, board):
+        Command.__init__(self, board, 'e', 'E', "")
 
 class CmdAnalogLabel(Command):
     def __init__(self, board, index):
@@ -244,6 +248,8 @@ class CmdAnalogLabel(Command):
 class CmdGetAnalog(Command):
     def __init__(self, board, interval):
         Command.__init__(self, board, 'd', 'D', struct.pack('B', interval))
+        if not interval:
+            self.reply_id = None
 
     def parse_reply(self, reply):
         return struct.unpack("33h", reply)
@@ -308,24 +314,33 @@ class CmdGetMotorMixer(Command):
 
 
 class MK(object):
-    def __init__(self, device):
-        self.selected = None
-
-        self.device = open(device, "r+b")
-        fd = self.device.fileno()
-
-        tca = termios.tcgetattr( fd )
-        tca[4] = termios.B57600
-        tca[5] = termios.B57600
-        termios.tcsetattr( fd, termios.TCSAFLUSH, tca )
-
+    def __init__(self, name):
+        self.name = name
         self.debug = False
-        self.line = ""
+
+        self.device = None
+        self.reconnect()
 
         self.fc = FlightCtrl()
         self.nc = NaviCtrl()
         self.gps = MKGPS()
         self.mk3mag = MK3Mag()
+
+    def reconnect(self):
+        if self.device:
+            self.device.close()
+            if self.debug:
+                print "reconnecting"
+
+        self.device = open(self.name, "r+b")
+        fd = self.device.fileno()
+        self.selected = None
+        self.line = ""
+
+        tca = termios.tcgetattr( fd )
+        tca[4] = termios.B57600
+        tca[5] = termios.B57600
+        termios.tcsetattr( fd, termios.TCSAFLUSH, tca )
 
     def recv_data(self, timeout):
         fd = self.device.fileno()
@@ -344,10 +359,9 @@ class MK(object):
             if not received:
                 received = self.recv_data(timeout)
                 if not received: return None
-                #print "received", len(received)
-                #print ">>>", received, "<<<"
+                if self.debug:
+                    print "received", len(received)
                 timeout = until - time.time()
-                #print "timeout", timeout
 
             c = received[0]
             received = received[1:]
@@ -379,6 +393,8 @@ class MK(object):
             if r_addr == board.addr and r_id == id:
                 return r_data
             else:
+                if self.debug and r_addr == 'd' and r_id == 'w':
+                    continue # ignore heading request
                 if self.debug:
                     print "unexpected packet", r_addr, r_id, r_data
         return None
@@ -386,6 +402,8 @@ class MK(object):
 
     def send_data(self, data, wait):
         wrote = os.write(self.device.fileno(), data)
+        if self.debug:
+            print "sent", wrote
 
         if wait:
             time.sleep(wait)
@@ -412,16 +430,27 @@ class MK(object):
         self.select_board(cmd.board)
         self.line = ""
 
+        if not cmd.reply_id:
+            self.send_data(cmd.get_frame(), 0)
+            return None
+
         reply = None
-        while not reply and cmd.tries:
+        tries = cmd.tries
+        while not reply and tries:
             self.send_data(cmd.get_frame(), 0)
             reply = self.recv_packet(cmd.board, cmd.reply_id, 0.5)
-            cmd.tries -= 1
+            tries -= 1
 
         if reply:
             return cmd.parse_reply(reply)
         else:
             return None
 
+    def recv_cmd(self, cmd):
+        reply = self.recv_packet(cmd.board, cmd.reply_id, 0.5)
+        if reply:
+            return cmd.parse_reply(reply)
+        else:
+            return None
 
 
