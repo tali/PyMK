@@ -220,12 +220,17 @@ class Command(object):
     def parse_reply(self, reply):
         return reply
 
+class CmdRedirect(Command):
+    def __init__(self, proxy, target):
+        data = struct.pack('B', target.redirect)
+        Command.__init__(self, proxy, 'u', None, data)
+
 class CmdVersion(Command):
     def __init__(self, board):
         Command.__init__(self, board, 'v', 'V', [])
 
     def parse_reply(self, reply):
-        major, minor, patch = struct.unpack("BBxxBx")
+        major, minor, patch = struct.unpack("BBxxBx6x", reply)
         return "%d.%d%s" % ( major, minor, chr( ord('a') + patch) )
 
 class CmdAnalogLabel(Command):
@@ -297,6 +302,7 @@ class MK(object):
         tca[5] = termios.B57600
         termios.tcsetattr( fd, termios.TCSAFLUSH, tca )
 
+        self.debug = False
         self.line = ""
 
         self.fc = FlightCtrl()
@@ -336,16 +342,17 @@ class MK(object):
             if len(self.line) == 0: continue
 
             if self.line[0] != '#':
-                print "line in:", self.line
+                if self.debug:
+                    print "line in:", self.line
                 self.line = ""
                 continue
 
             packet = self.line[1:]
             self.line = ""
-            #print "received_packet"
             crc = calc_crc(packet[:-2])
             if crc != packet[-2:]:
-                print "CRC!", crc, packet
+                if self.debug:
+                    print "CRC error", crc, packet
                 continue
 
             r_addr = packet[0]
@@ -355,16 +362,13 @@ class MK(object):
             if r_addr == board.addr and r_id == id:
                 return r_data
             else:
-                if r_addr == 'd' and r_id == 'w':
-                    # ignore heading requests
-                    continue
-                print "unexpected packet", r_addr, r_id, r_data
+                if self.debug:
+                    print "unexpected packet", r_addr, r_id, r_data
         return None
 
 
     def send_data(self, data, wait):
         wrote = os.write(self.device.fileno(), data)
-        #print "send_data", wrote, data
 
         if wait:
             time.sleep(wait)
@@ -380,8 +384,8 @@ class MK(object):
         self.send_data(escape, 0.1)
 
         if board.redirect != None:
-            
             redirect = Command(self.nc, 'u', None, struct.pack('B', board.redirect))
+            redirect = CmdRedirect(self.nc, board)
             self.send_data(redirect.get_frame(), 0.1)
 
         self.selected = board

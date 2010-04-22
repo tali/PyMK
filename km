@@ -26,13 +26,16 @@ parser.add_option("--load-mixer", metavar="MKM",
 #        help="log GPS data")
 parser.add_option("--channels", action='store_true',
         help="show channels")
-#parser.add_option("--debug", action='store_true',
-#        help="")
+parser.add_option("--debug", action='store_true',
+        help="")
 
 (options, args) = parser.parse_args()
 
 
 mk = MK(options.device)
+
+if options.debug:
+    mk.debug = True
 
 if options.info:
     cmd = CmdVersion(mk.fc)
