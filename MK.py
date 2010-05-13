@@ -182,7 +182,15 @@ class MKGPS(Board):
 
 
 class Command(object):
+    """
+    A command which can be sent to the Mikrokopter.
+    """
     def __init__(self, board, id, reply_id, data):
+        """
+        Create a new Command.
+        You have to specify the destination board and the ID code of the command
+        and the reply along with the payload data.
+        """
         self.board = board
         self.id = id
         self.tries = 3
@@ -192,17 +200,33 @@ class Command(object):
         self.reply = None
 
     def get_frame(self):
+        """
+        Get the encoded data frame which is sent to the MikroKopter over the
+        serial line.
+        """
         return self.frame
 
     def parse_reply(self, reply):
+        """
+        Decode the reply message.
+        """
         return reply
 
 class CmdRedirect(Command):
+    """
+    The command to redirect the serial line from NaviCtrl to one of the
+    other boards.
+    It has no reply.
+    """
     def __init__(self, proxy, target):
         data = struct.pack('B', target.redirect)
         Command.__init__(self, proxy, 'u', None, data)
 
 class CmdVersion(Command):
+    """
+    Obtain version information.
+    Result is returned as a string (e.g. "0.78f").
+    """
     def __init__(self, board):
         Command.__init__(self, board, 'v', 'V', "")
 
@@ -211,10 +235,17 @@ class CmdVersion(Command):
         return "%d.%d%s" % ( major, minor, chr( ord('a') + patch) )
 
 class CmdErrorMsg(Command):
+    """
+    Obtain error message from NaviCtrl.
+    """
     def __init__(self, board):
         Command.__init__(self, board, 'e', 'E', "")
 
 class CmdAnalogLabel(Command):
+    """
+    Obtain the label of an analog debug signal.
+    Result is returned as string.
+    """
     def __init__(self, board, index):
         Command.__init__(self, board, 'a', 'A', struct.pack('B', index))
 
@@ -223,6 +254,12 @@ class CmdAnalogLabel(Command):
         return name
 
 class CmdGetAnalog(Command):
+    """
+    Obtain analog debug signals.
+    Result is returned as a list of integers.
+    First is a unsigned with 16 bits, followed by 32 signed integers.
+    Labels of the 32 analog values can be obtained with CmdAnalogLabel.
+    """
     def __init__(self, board, interval):
         Command.__init__(self, board, 'd', 'D', struct.pack('B', interval))
         if not interval:
@@ -232,6 +269,13 @@ class CmdGetAnalog(Command):
         return struct.unpack("33h", reply)
 
 class CmdGetSettings(Command):
+    """
+    Obtain settings.
+    Use index 0xff to get the current configuration.
+    Result is returned as a tuple (set, version, setting).
+    set is the currently active configuration set, setting is a map
+    with the actual configuration.
+    """
     def __init__(self, board, index):
         Command.__init__(self, board, 'q', 'Q', struct.pack('B', index))
 
@@ -245,6 +289,10 @@ class CmdGetSettings(Command):
         return set, version, setting
 
 class CmdSetSettings(Command):
+    """
+    Write a new configuration.
+    Parameters are the same as the reply of CmdGetSettings
+    """
     def __init__(self, board, set, version, setting):
         data = struct.pack("2B", set, version)
         for name in settings:
