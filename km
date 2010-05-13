@@ -22,6 +22,10 @@ parser.add_option("--monitor", metavar="FC|NC|Mag",
         help="Display analog values")
 parser.add_option("--show-settings", metavar="INDEX",
         help="show settings")
+parser.add_option("--load-settings", metavar="FILE",
+        help="show settings")
+parser.add_option("--save-settings", metavar="FILE",
+        help="show settings")
 parser.add_option("--get", metavar="KEY",
         help="request a setting")
 parser.add_option("--set", metavar="KEY=VALUE",
@@ -34,6 +38,12 @@ parser.add_option("--load-mixer", metavar="MKM",
 #        help="log GPS data")
 parser.add_option("--channels", action='store_true',
         help="show channels")
+parser.add_option("--reset", metavar="FC|NC|Mag",
+        help="reset a board")
+parser.add_option("--reset-settings", action='store_true',
+        help="reset a board")
+parser.add_option("--flash-software", metavar="FILE",
+        help="load new system software")
 parser.add_option("--debug", action='store_true',
         help="")
 
@@ -41,6 +51,17 @@ parser.add_option("--debug", action='store_true',
 
 
 mk = MK(options.device)
+
+def get_board(name):
+    if name == "FC":
+        return mk.fc
+    elif name == "NC":
+        return mk.nc
+    elif name == "Mag":
+        return mk.mk3mag
+    else:
+        parser.error("use FC, NC, or Mag as board name")
+
 
 if options.debug:
     mk.debug = True
@@ -61,18 +82,10 @@ if options.info:
     cmd = CmdErrorMsg(mk.nc)
     reply = mk.send_cmd(cmd)
     if reply:
-        print "Error Message:", reply
+        print "Status:", reply
 
 if options.monitor:
-    if options.monitor == "FC":
-        board = mk.fc
-    elif options.monitor == "NC":
-        board = mk.nc
-    elif options.monitor == "Mag":
-        board = mk.mk3mag
-    else:
-        parser.error("monitor FC, NC, or Mag")
-
+    board = get_board(options.monitor)
     label = []
     for index in range(0, 32):
         cmd = CmdAnalogLabel(board, index)
@@ -80,8 +93,8 @@ if options.monitor:
         label.append( reply )
         print ".",
 
-    cmd = CmdGetAnalog(board, 20)
-    stop = CmdGetAnalog(board, 0)
+    cmd = CmdGetDebug(board, 20)
+    stop = CmdGetDebug(board, 0)
     reply = mk.send_cmd(cmd)
     while True:
         try:
@@ -198,7 +211,94 @@ if options.show_mixer:
         motor += 1
 
 
+if options.reset:
+    board = get_board(options.reset)
+    cmd = CmdReset(board)
+    mk.send_cmd(cmd)
+    print mk.recv_data(4096, 5)
 
+if options.flash_software:
+    board = mk.nc
+    cmd = CmdReset(board)
+    mk.send_cmd(cmd)
+    reply = ""
+    print "entering bootloader",
+    while reply.find("MKBL") == -1:
+        print ".",
+        time.sleep(0.1)
+        mk.send_data( chr(27), 0.020 )
+        mk.send_data( chr(0xaa), 0 )
+        data = mk.recv_timeout(4096, 0.2)
+        if mk.debug:
+            for c in data: print hex(ord(c)),
+            if data: print "'%s'" % data
+        reply += data
+    print "MKBL"
+    # read any pending data
+    while mk.recv_timeout(4096, 0.5): pass
+
+    cpu = None
+    if mk.debug:
+        print "determining CPU"
+    mk.send_data( 't', 0 )
+    data = mk.recv_data(2, 1)
+    if mk.debug:
+        for c in data: print hex(ord(c)),
+    for c in data:
+        if c == chr(0x74):
+            type = c
+            cpu = "MEGA644"
+            break
+        elif c == chr(0x76):
+            type = c
+            cpu = "MEGA8"
+            break
+        elif c == chr(0x78):
+            type = c
+            cpu = "MEGA168"
+            break
+        elif c == chr(0xe0):
+            type = c
+            cpu = "STR91x"
+            break
+    if not cpu:
+        mk.send_data( 'E', 0)
+        raise "could not determine CPU"
+    print "CPU", cpu
+
+    if mk.debug:
+        print "setting device type"
+    mk.send_data('T' + type, 0)
+    data = mk.recv_data(1, 1)
+    if mk.debug:
+        for c in data: print hex(ord(c)),
+    if data != chr(0x0d):
+        mk.send_data( 'E', 0)
+        raise "could not set CPU type"
+
+    if mk.debug:
+        print "requesting version"
+    mk.send_data('V', 0)
+    data = mk.recv_data(2, 1)
+    if mk.debug:
+        for c in data: print hex(ord(c)),
+    print "version", data
+
+    if mk.debug:
+        print "get buffer size"
+    mk.send_data('b', 0)
+    data = mk.recv_data(3, 1)
+    if mk.debug:
+        for c in data: print hex(ord(c)),
+    if len(data) != 3 or data[0] != 'Y':
+        mk.send_data( 'E', 0)
+        raise "could not get buffer size"
+    buffersize, = struct.unpack('H', data[1:3])
+    print "buffer size", buffersize
+
+
+    # exit boot loader
+    mk.send_data( 'E', 0)
 
 #if options.gps:
 #    send_packet(link, 'c', 'u', [2])

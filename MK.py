@@ -253,7 +253,7 @@ class CmdAnalogLabel(Command):
         index, name = struct.unpack("B 16s x", reply)
         return name
 
-class CmdGetAnalog(Command):
+class CmdGetDebug(Command):
     """
     Obtain analog debug signals.
     Result is returned as a list of integers.
@@ -266,7 +266,7 @@ class CmdGetAnalog(Command):
             self.reply_id = None
 
     def parse_reply(self, reply):
-        return struct.unpack("33h", reply)
+        return struct.unpack("H32h", reply)
 
 class CmdGetSettings(Command):
     """
@@ -337,6 +337,10 @@ class CmdGetMotorMixer(Command):
             data += struct.unpack("4b", reply[:4])
         return name, data
 
+class CmdReset(Command):
+    def __init__(self, board):
+        Command.__init__(self, board, 'R', None, "")
+
 
 class MK(object):
     def __init__(self, name):
@@ -367,13 +371,27 @@ class MK(object):
         tca[5] = termios.B57600
         termios.tcsetattr( fd, termios.TCSAFLUSH, tca )
 
-    def recv_data(self, timeout):
-        fd = self.device.fileno()
-        r, w, e = select.select([fd], [], [], timeout)
+    def recv_bytes(self, bytes):
+        return os.read(self.device.fileno(), bytes)
+
+    def recv_timeout(self, bytes, timeout):
+        r, w, e = select.select([self.device.fileno()], [], [], timeout)
         if len(r):
-            return os.read(fd, 4096)
+            return self.recv_bytes(bytes)
         else:
             return ""
+
+    def recv_data(self, bytes, timeout):
+        until = time.time() + timeout
+        data = ""
+        while len(data) < bytes and timeout > 0:
+            received = self.recv_timeout(bytes - len(data), timeout)
+            data += received
+            if self.debug:
+                print "received", len(received)
+            if not received: break
+            timeout = until - time.time()
+        return data
 
     def recv_packet(self, board, id, timeout):
 
@@ -382,7 +400,7 @@ class MK(object):
         received = ""
         while timeout > 0:
             if not received:
-                received = self.recv_data(timeout)
+                received = self.recv_timeout(4096, timeout)
                 if not received: return None
                 if self.debug:
                     print "received", len(received)
@@ -424,9 +442,11 @@ class MK(object):
                     print "unexpected packet", r_addr, r_id, r_data
         return None
 
+    def send_bytes(self, data):
+        return os.write(self.device.fileno(), data)
 
     def send_data(self, data, wait):
-        wrote = os.write(self.device.fileno(), data)
+        wrote = self.send_bytes(data)
         if self.debug:
             print "sent", wrote
 
