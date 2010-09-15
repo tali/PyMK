@@ -293,7 +293,7 @@ if options.flash_software:
     if len(data) != 3 or data[0] != 'Y':
         mk.send_data( 'E', 0)
         raise "could not get buffer size"
-    buffersize, = struct.unpack('H', data[1:3])
+    buffersize, = struct.unpack('!H', data[1:3])
     print "buffer size", buffersize
 
 

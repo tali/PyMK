@@ -266,7 +266,7 @@ class CmdGetDebug(Command):
             self.reply_id = None
 
     def parse_reply(self, reply):
-        return struct.unpack("H32h", reply)
+        return struct.unpack("<H32h", reply)
 
 class CmdGetSettings(Command):
     """
@@ -308,7 +308,7 @@ class CmdGetChannels(Command):
         Command.__init__(self, board, 'p', 'P', "")
 
     def parse_reply(self, reply):
-        return struct.unpack("8h", reply[:16])
+        return struct.unpack("<8h", reply[:16])
 
 
 class CmdSetMotorMixer(Command):
