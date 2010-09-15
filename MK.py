@@ -157,14 +157,14 @@ class FlightCtrl(Board):
     def __init__(self):
         Board.__init__(self)
         self.addr = 'b'
-        self.name = "FlightCtrl"
+        self.name = "Flight-Ctrl"
         self.redirect = 0
 
 class NaviCtrl(Board):
     def __init__(self):
         Board.__init__(self)
         self.addr = 'c'
-        self.name = "NaviCtrl"
+        self.name = "Navi-Ctrl"
 
 class MK3Mag(Board):
     def __init__(self):
