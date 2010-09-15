@@ -337,6 +337,12 @@ class CmdGetMotorMixer(Command):
             data += struct.unpack("4b", reply[:4])
         return name, data
 
+class CmdMotorTest(Command):
+    def __init__(self, board, list):
+        while len(list) < 16: list += [0]
+        payload = struct.pack("16B", *list)
+        Command.__init__(self, board, 't', 'T', payload)
+
 class CmdReset(Command):
     def __init__(self, board):
         Command.__init__(self, board, 'R', None, "")

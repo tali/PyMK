@@ -38,6 +38,8 @@ parser.add_option("--load-mixer", metavar="MKM",
 #        help="log GPS data")
 parser.add_option("--channels", action='store_true',
         help="show channels")
+parser.add_option("--motor-test", metavar="MOTOR=SPEED",
+        help="test one motor")
 parser.add_option("--reset", metavar="FC|NC|Mag",
         help="reset a board")
 parser.add_option("--reset-settings", action='store_true',
@@ -210,6 +212,12 @@ if options.show_mixer:
         table = table[4:]
         motor += 1
 
+if options.motor_test:
+    list = [0] * 16
+    motor, speed = options.motor_test.split('=')
+    list[int(motor)] = int(speed)
+    cmd = CmdMotorTest(mk.fc, list)
+    mk.send_cmd(cmd)
 
 if options.reset:
     board = get_board(options.reset)
