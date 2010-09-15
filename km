@@ -226,13 +226,17 @@ if options.reset:
     print mk.recv_data(4096, 5)
 
 if options.flash_software:
-    board = mk.nc
+    filename = os.path.basename( options.flash_software )
+    boardName, cpuName, rest = filename.split('_', 2)
+    board = get_board( boardName )
+    print "entering bootloader of", board.name,
     cmd = CmdReset(board)
     mk.send_cmd(cmd)
     reply = ""
-    print "entering bootloader",
-    while reply.find("MKBL") == -1:
+    tries = 10
+    while reply.find("MKBL") == -1 and tries > 0:
         print ".",
+        tries -= 1
         time.sleep(0.1)
         mk.send_data( chr(27), 0.020 )
         mk.send_data( chr(0xaa), 0 )
@@ -241,7 +245,9 @@ if options.flash_software:
             for c in data: print hex(ord(c)),
             if data: print "'%s'" % data
         reply += data
-    print "MKBL"
+    if not tries:
+        raise "FAILED"
+    print "OK"
     # read any pending data
     while mk.recv_timeout(4096, 0.5): pass
 
@@ -252,31 +258,32 @@ if options.flash_software:
     data = mk.recv_data(2, 1)
     if mk.debug:
         for c in data: print hex(ord(c)),
-    for c in data:
-        if c == chr(0x74):
-            type = c
-            cpu = "MEGA644"
-            break
-        elif c == chr(0x76):
-            type = c
-            cpu = "MEGA8"
-            break
-        elif c == chr(0x78):
-            type = c
-            cpu = "MEGA168"
-            break
-        elif c == chr(0xe0):
-            type = c
-            cpu = "STR91x"
-            break
-    if not cpu:
+    if data == chr(0x74)+chr(0):
+        cpuType = data[0]
+        cpu = "MEGA644"
+        memory = 64 * 1024
+    elif data == chr(0x76)+chr(0):
+        cpuType = data[0]
+        cpu = "MEGA8"
+        memory = 8 * 1024
+    elif data == chr(0x78)+chr(0):
+        cpuType = data[0]
+        cpu = "MEGA168"
+        memory = 16 * 1024
+    elif data == chr(0xe0)+chr(0):
+        cpuType = data[0]
+        cpu = "STR9"
+        memory = 256 * 1024
+    else:
         mk.send_data( 'E', 0)
         raise "could not determine CPU"
     print "CPU", cpu
+    if cpu != cpuName:
+        raise "wrong CPU type"
 
     if mk.debug:
         print "setting device type"
-    mk.send_data('T' + type, 0)
+    mk.send_data('T' + cpuType, 0)
     data = mk.recv_data(1, 1)
     if mk.debug:
         for c in data: print hex(ord(c)),
@@ -290,7 +297,7 @@ if options.flash_software:
     data = mk.recv_data(2, 1)
     if mk.debug:
         for c in data: print hex(ord(c)),
-    print "version", data
+    print "bootloader version", data
 
     if mk.debug:
         print "get buffer size"
@@ -304,6 +311,31 @@ if options.flash_software:
     buffersize, = struct.unpack('!H', data[1:3])
     print "buffer size", buffersize
 
+    # dump old contents
+    mk.send_data('A' + chr(0) + chr(0), 0)
+    data = mk.recv_data(1, 1)
+    if data != chr(0x0d):
+        mk.send_data( 'E', 0)
+        raise "could not set target address"
+    data = ""
+    while len(data) < memory:
+        print "downloading", len(data), "\r",
+        mk.send_data('g' + struct.pack('!H', buffersize) + 'F', 0)
+        received = mk.recv_data(buffersize, 10)
+        if not received:
+            print "nothing received at", len(data)
+            raise "recv error"
+        elif len(received) != buffersize:
+            print "received", len(received), "instead of", buffersize
+            if mk.debug:
+                for c in received: print hex(ord(c)),
+                print ""
+            raise "recv error"
+        data += received
+    print "writing backup         \r",
+    with open( option.flash_software + ".bak", "wt" ) as bak:
+        bak.write(data)
+    print "backup OK     "
 
     # exit boot loader
     mk.send_data( 'E', 0)
