@@ -59,7 +59,7 @@ def get_board(name):
         return mk.fc
     elif name == mk.nc.name or name.upper() == "NC":
         return mk.nc
-    elif name == mk.mk3mag.name or name.upper() == "Mag":
+    elif name == mk.mk3mag.name or name.upper() == "MAG":
         return mk.mk3mag
     else:
         parser.error("use FC, NC, or Mag as board name")
