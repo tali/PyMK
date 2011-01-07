@@ -2,11 +2,13 @@
 
 import asyncore
 import os
+import sys
 import termios
 from optparse import *
 
 from MK import *
 from ubx import *
+from intelhex import IntelHex
 
 
 parser = OptionParser()
@@ -227,6 +229,8 @@ if options.reset:
 
 if options.flash_software:
     filename = os.path.basename( options.flash_software )
+    binary = IntelHex( options.flash_software )
+    binary.readfile()
     boardName, cpuName, rest = filename.split('_', 2)
     board = get_board( boardName )
     print "entering bootloader of", board.name,
@@ -236,6 +240,7 @@ if options.flash_software:
     tries = 10
     while reply.find("MKBL") == -1 and tries > 0:
         print ".",
+        sys.stdout.flush()
         tries -= 1
         time.sleep(0.1)
         mk.send_data( chr(27), 0.020 )
@@ -246,7 +251,8 @@ if options.flash_software:
             if data: print "'%s'" % data
         reply += data
     if not tries:
-        raise "FAILED"
+        print "FAILED"
+        sys.exit(1)
     print "OK"
     # read any pending data
     while mk.recv_timeout(4096, 0.5): pass
@@ -276,10 +282,18 @@ if options.flash_software:
         memory = 256 * 1024
     else:
         mk.send_data( 'E', 0)
-        raise "could not determine CPU"
+        print "failed to determine CPU"
+        sys.exit(1)
     print "CPU", cpu
     if cpu != cpuName:
-        raise "wrong CPU type"
+        mk.send_data( 'E', 0)
+        print "wrong CPU type"
+        sys.exit(1)
+
+    if binary.maxaddr() >= memory:
+        print "image does not fit into memory"
+        mk.send_data( 'E', 0)
+        sys.exit(1)
 
     if mk.debug:
         print "setting device type"
@@ -289,7 +303,8 @@ if options.flash_software:
         for c in data: print hex(ord(c)),
     if data != chr(0x0d):
         mk.send_data( 'E', 0)
-        raise "could not set CPU type"
+        print "could not set CPU type"
+        sys.exit(1)
 
     if mk.debug:
         print "requesting version"
@@ -307,38 +322,125 @@ if options.flash_software:
         for c in data: print hex(ord(c)),
     if len(data) != 3 or data[0] != 'Y':
         mk.send_data( 'E', 0)
-        raise "could not get buffer size"
+        print "could not get buffer size"
+        sys.exit(1)
     buffersize, = struct.unpack('!H', data[1:3])
     print "buffer size", buffersize
 
-    # dump old contents
-    mk.send_data('A' + chr(0) + chr(0), 0)
+#    # dump old contents
+#    offset = 0
+#    mk.send_data('A' + struct.pack('!H', offset), 0)
+#    data = mk.recv_data(1, 1)
+#    if data != chr(0x0d):
+#        mk.send_data( 'E', 0)
+#        raise "could not set target address"
+#    backup = IntelHex(None)
+#    while offset < memory:
+#        print "downloading", offset, "\r",
+#        sys.stdout.flush()
+#        mk.send_data('g' + struct.pack('!H', buffersize) + 'F', 0)
+#        received = mk.recv_data(buffersize, 10)
+#        if not received:
+#            print "nothing received at", len(data)
+#            raise "recv error"
+#        elif len(received) != buffersize:
+#            print "received", len(received), "instead of", buffersize
+#            if mk.debug:
+#                for c in received: print hex(ord(c)),
+#                print ""
+#            raise "recv error"
+#        for byte in received:
+#            backup[offset] = ord(byte)
+#            offset += 1
+#    print "writing backup         \r",
+#    sys.stdout.flush()
+#    backup.writefile( options.flash_software + ".bak" )
+#    print "backup OK     "
+
+#    # TODO: for NC: set size which has to be erased
+#    print "clearing flash",
+#    mk.send_data('e', 0)
+#    data = mk.recv_data(1, 10)
+#    if mk.debug:
+#        for c in data: print hex(ord(c)),
+#    if data != chr(0x0d):
+#        mk.send_data( 'E', 0)
+#        print "could not clear flash"
+#        sys.exit(1)
+#
+#    # flash new software
+#    offset = binary.minaddr()
+#    end = binary.maxaddr()
+#    mk.send_data('A' + struct.pack('!H', offset), 0)
+#    data = mk.recv_data(1, 1)
+#    if data != chr(0x0d):
+#        mk.send_data( 'E', 0)
+#        print "could not set target address"
+#        sys.exit(1)
+#    while offset <= end:
+#        print "writing", offset, "\r",
+#        sys.stdout.flush()
+#        size = buffersize
+#        if size > end - offset+1: size = end-offset+1
+#        block = ""
+#        for i in range(size):
+#            block += chr( binary[offset] )
+#            offset += 1
+#        mk.send_data('B' + struct.pack('!H', size) + 'F', 0)
+#        mk.send_data(block, 0)
+#        # TODO: for NC: CRC
+#        received = mk.recv_data(1, 10)
+#        if not received:
+#            print "nothing received at", len(data)
+#            mk.send_data( 'E', 0)
+#            sys.exit(1)
+#        elif received != chr(0x0d):
+#            print "write error", hex(ord(received)), "at", offset
+#            mk.send_data( 'E', 0)
+#            sys.exit(1)
+#    print "wrote", offset, "bytes"
+
+    # verify software
+    offset = binary.minaddr()
+    end = binary.maxaddr()
+    mk.send_data('A' + struct.pack('!H', offset), 0)
     data = mk.recv_data(1, 1)
     if data != chr(0x0d):
         mk.send_data( 'E', 0)
-        raise "could not set target address"
-    data = ""
-    while len(data) < memory:
-        print "downloading", len(data), "\r",
-        mk.send_data('g' + struct.pack('!H', buffersize) + 'F', 0)
-        received = mk.recv_data(buffersize, 10)
+        print "could not set target address"
+        sys.exit(1)
+    ok = True
+    while offset <= end:
+        print "verifying", offset, "\r",
+        sys.stdout.flush()
+        size = buffersize
+        if size > end - offset+1: size = end-offset+1
+        mk.send_data('g' + struct.pack('!H', size) + 'F', 0)
+        received = mk.recv_data(size, 10)
         if not received:
             print "nothing received at", len(data)
-            raise "recv error"
-        elif len(received) != buffersize:
-            print "received", len(received), "instead of", buffersize
+            ok = False
+        elif len(received) != size:
+            print "received", len(received), "instead of", size
+            ok = False
             if mk.debug:
                 for c in received: print hex(ord(c)),
                 print ""
-            raise "recv error"
-        data += received
-    print "writing backup         \r",
-    with open( option.flash_software + ".bak", "wt" ) as bak:
-        bak.write(data)
-    print "backup OK     "
-
+        for byte in received:
+            if binary[offset] != ord(byte):
+                ok = False
+                break
+            offset += 1
+        if not ok:
+            break
     # exit boot loader
     mk.send_data( 'E', 0)
+
+    if ok:
+        print "verify OK          "
+    else:
+        print "verify error at offset", offset
+        sys.exit(1)
 
 #if options.gps:
 #    send_packet(link, 'c', 'u', [2])
