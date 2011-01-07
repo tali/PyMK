@@ -462,7 +462,8 @@ class MK(object):
 
     def select_board(self, board):
         if board == self.selected: return
-        #print "select_board"
+        if self.debug:
+            print "selecting", board.name
 
         # cancel existing redirections
         escape = "#" + chr(0x1b) + chr(0x1b)
@@ -475,6 +476,9 @@ class MK(object):
             self.send_data(redirect.get_frame(), 0.1)
 
         self.selected = board
+#        time.sleep(0.1)
+        # read any pending data
+        self.recv_data(1024, 0.2)
 
 
     def send_cmd(self, cmd):
