@@ -476,7 +476,8 @@ class MK(object):
             self.send_data(redirect.get_frame(), 0.1)
 
         self.selected = board
-#        time.sleep(0.1)
+        # put the command processor in defined state:
+        self.send_data('\r', 0)
         # read any pending data
         self.recv_data(1024, 0.2)
 
