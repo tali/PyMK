@@ -10,95 +10,255 @@ import time
 _zero = ord('=')
 
 
-settings = [
-    "Channel_Gas", "Channel_Gier", "Channel_Nick", "Channel_Roll",
-    "POTI1", "POTI2", "POTI3", "POTI4", "POTI5", "POTI6", "POTI7", "POTI8",
-    "GlobalConfig",            # 0x01=Höhenregler aktiv,0x02=Kompass aktiv, 0x04=GPS aktiv, 0x08=Heading Hold aktiv
-    "Hoehe_MinGas",            # Wert : 0-100
-    "Luftdruck_D",             # Wert : 0-250
-    "MaxHoehe",                # Wert : 0-32
-    "Hoehe_P",                 # Wert : 0-32
-    "Hoehe_Verstaerkung",      # Wert : 0-50
-    "Hoehe_ACC_Wirkung",       # Wert : 0-250
-    "Hoehe_HoverBand",         # Wert : 0-250
-    "Hoehe_GPS_Z",             # Wert : 0-250
-    "Hoehe_StickNeutralPoint", # Wert : 0-250
-    "Stick_P",                 # Wert : 1-6
-    "Stick_D",                 # Wert : 0-64
-    "Gier_P",                  # Wert : 1-20
-    "Gas_Min",                 # Wert : 0-32
-    "Gas_Max",                 # Wert : 33-250
-    "GyroAccFaktor",           # Wert : 1-64
-    "KompassWirkung",          # Wert : 0-32
-    "Gyro_P",                  # Wert : 10-250
-    "Gyro_I",                  # Wert : 0-250
-    "Gyro_D",                  # Wert : 0-250
-    "Gyro_Gier_P",             # Wert : 10-250
-    "Gyro_Gier_I",             # Wert : 0-250
-    "UnterspannungsWarnung",   # Wert : 0-250
-    "NotGas",                  # Wert : 0-250     //Gaswert bei Empängsverlust
-    "NotGasZeit",              # Wert : 0-250     // Zeitbis auf NotGas geschaltet wird, wg. Rx-Problemen
-    "Receiver",                # 0= Summensignal, 1= Spektrum, 2 =Jeti, 3=ACT DSL, 4=ACT S3D
-    "I_Faktor",                # Wert : 0-250
-    "UserParam1",              # Wert : 0-250
-    "UserParam2",              # Wert : 0-250
-    "UserParam3",              # Wert : 0-250
-    "UserParam4",              # Wert : 0-250
-    "ServoNickControl",        # Wert : 0-250     // Stellung des Servos
-    "ServoNickComp",           # Wert : 0-250     // Einfluss Gyro/Servo
-    "ServoNickMin",            # Wert : 0-250     // Anschlag
-    "ServoNickMax",            # Wert : 0-250     // Anschlag
-    "ServoRollControl",        # Wert : 0-250     // Stellung des Servos
-    "ServoRollComp",           # Wert : 0-250
-    "ServoRollMin",            # Wert : 0-250
-    "ServoRollMax",            # Wert : 0-250
-    "ServoNickRefresh",        # Speed of the Servo
-    "Servo3",                  # Value or mapping of the Servo Output
-    "Servo4",                  # Value or mapping of the Servo Output
-    "Servo5",                  # Value or mapping of the Servo Output
-    "LoopGasLimit",            # Wert: 0-250  max. Gas während Looping
-    "LoopThreshold",           # Wert: 0-250  Schwelle für Stickausschlag
-    "LoopHysterese",           # Wert: 0-250  Hysterese für Stickausschlag
-    "AchsKopplung1",           # Wert: 0-250  Faktor, mit dem Gier die Achsen Roll und Nick koppelt (NickRollMitkopplung)
-    "AchsKopplung2",           # Wert: 0-250  Faktor, mit dem Nick und Roll verkoppelt werden
-    "CouplingYawCorrection",   # Wert: 0-250  Faktor, mit dem Nick und Roll verkoppelt werden
-    "WinkelUmschlagNick",      # Wert: 0-250  180°-Punkt
-    "WinkelUmschlagRoll",      # Wert: 0-250  180°-Punkt
-    "GyroAccAbgleich",         # 1/k  (Koppel_ACC_Wirkung)
-    "Driftkomp",
-    "DynamicStability",
-    "UserParam5",              # Wert : 0-250
-    "UserParam6",              # Wert : 0-250
-    "UserParam7",              # Wert : 0-250
-    "UserParam8",              # Wert : 0-250
-    "J16Bitmask",              # for the J16 Output
-    "J16Timing",               # for the J16 Output
-    "J17Bitmask",              # for the J17 Output
-    "J17Timing",               # for the J17 Output
-    "WARN_J16_Bitmask",        # for the J16 Output
-    "WARN_J17_Bitmask",        # for the J17 Output
-    "NaviGpsModeControl",      # Parameters for the Naviboard
-    "NaviGpsGain",
-    "NaviGpsP",
-    "NaviGpsI",
-    "NaviGpsD",
-    "NaviGpsPLimit",
-    "NaviGpsILimit",
-    "NaviGpsDLimit",
-    "NaviGpsACC",
-    "NaviGpsMinSat",
-    "NaviStickThreshold",
-    "NaviWindCorrection",
-    "NaviSpeedCompensation",
-    "NaviOperatingRadius",
-    "NaviAngleLimitation",
-    "NaviPH_LoginTime",
-    "ExternalControl",        # for serial Control
-    "BitConfig",          # (war Loop-Cfg) Bitcodiert: 0x01=oben, 0x02=unten, 0x04=links, 0x08=rechts / wird getrennt behandelt
-    "ServoCompInvert",    # 0x01 = Nick, 0x02 = Roll   0 oder 1  // WICHTIG!!! am Ende lassen
-    "ExtraConfig",        # bitcodiert
-#   char Name[12];
-    ]
+class Setting(object):
+    def __init__(self, name):
+        self.name = name
+        self.value = None
+        self.struct = struct.Struct( "B" )
+
+    def assign(self, value):
+        self.value = value
+
+    def __str__(self):
+        return str(self.value)
+
+    def pack(self):
+        return self.struct.pack(self.value)
+
+    def unpack(self, data):
+        self.value, = self.struct.unpack(data)
+
+
+class AnalogSetting(Setting):
+    def __init__(self, name, min=0, max=255):
+        Setting.__init__(self, name)
+        self.min = min
+        self.max = max
+
+    def assign(self, value):
+        if value < self.min: raise ValueError( "too low" )
+        if value > self.max: raise ValueError( "too high" )
+        self.value = int(value)
+
+class AnalogPotiSetting(AnalogSetting):
+    def assign(self, value):
+        if len(value) == 5 and value[0:5]=="POTI":
+            value = 255 - int(value[4:5]) - 1
+        else:
+            AnalogSetting.assign(self, value)
+
+    def __str__(self):
+        if self.value < 248:
+            return str(self.value)
+        else:
+            return "POTI" + str(255 - self.value + 1)
+
+
+class BinarySetting(Setting):
+    def assign(self, value):
+        self.value = int(value)
+
+    def __str__(self):
+        return bin(self.value)
+
+
+class ChoiceSetting(BinarySetting):
+    def __init__(self, name, choices):
+        BinarySetting.__init__(self, name)
+        self.choices = choices
+        self.reverse = {}
+        for k,v in choices.iteritems():
+            self.reverse[v] = k
+
+    def assign(self, value):
+        self.value = self.reverse[ value ]
+
+    def __str__(self):
+        return self.choices[ self.value ]
+
+
+class LabeledSetting(BinarySetting):
+    def __init__(self, name, labels):
+        BinarySetting.__init__(self, name)
+        self.labels = labels
+
+    def __str__(self):
+        mask = 1
+        index = 0
+
+        while self.value >= mask:
+            if self.value & mask:
+                print self.labels[index]
+
+
+
+class StringSetting(Setting):
+    def __init__(self, name, length):
+        Setting.__init__(self, name)
+        self.struct = struct.Struct( str(length) + "s" )
+
+    def unpack(self, data):
+        Setting.unpack(self, data)
+        # end string at the first \0 byte:
+        self.value = self.value[: self.value.find('\0') ]
+
+
+class Configuration(object):
+    def __init__(self, version):
+        self.version = version
+        self.setting = {}
+        self.structure = Configuration.settings(version)
+        for s in self.structure:
+            if s.name == "Name":
+                self.name = str(s)
+            else:
+                self.setting[ s.name ] = s
+
+    def set(self, key, value):
+        self.setting[key].assign(value)
+
+    def value(self, key):
+        self.setting[key].value
+
+    def get(self, key):
+        str( self.setting[key] )
+
+    def pack(self):
+        data = ""
+        for s in self.structure:
+            data += s.pack()
+        return data
+
+    def unpack(self, data):
+        for s in self.structure:
+            s.unpack( data[: s.struct.size ] )
+            data = data[ s.struct.size :]
+
+    @classmethod
+    def settings(cls, version):
+        if version < 82: raise ValueError("unsupported version")
+        if version > 85: raise ValueError("unsupported version")
+        list = [
+            AnalogSetting("Channel_Gas", max=15),
+            AnalogSetting("Channel_Gier", max=15),
+            AnalogSetting("Channel_Nick", max=15),
+            AnalogSetting("Channel_Roll", max=15),
+            AnalogSetting("POTI1", max=15), AnalogSetting("POTI2", max=15),
+            AnalogSetting("POTI3", max=15), AnalogSetting("POTI4", max=15),
+            AnalogSetting("POTI5", max=15), AnalogSetting("POTI6", max=15),
+            AnalogSetting("POTI7", max=15), AnalogSetting("POTI8", max=15),
+            BinarySetting("GlobalConfig"), # LabeledSetting( "GlobalConfig", ["AIRPRESS_SENSOR", "HEIGHT_SWITCH", "HEADING_HOLD", "COMPASS_ACTIVE", "COMPASS_FIX", "GPS_ACTIVE", "AXIS_COUPLING_ACTIVE", "ROTARY_RATE_LIMITER"]),
+            AnalogSetting("Hoehe_MinGas", max=100),
+            AnalogPotiSetting("Luftdruck_D"),
+            AnalogPotiSetting("MaxHoehe", max=32),
+            AnalogPotiSetting("Hoehe_P", max=32),
+            AnalogSetting("Hoehe_Verstaerkung", max=50),
+            AnalogPotiSetting("Hoehe_ACC_Wirkung"),
+            AnalogSetting("Hoehe_HoverBand"),
+            AnalogPotiSetting("Hoehe_GPS_Z"),
+            AnalogSetting("Hoehe_StickNeutralPoint"),
+            AnalogSetting("Stick_P", min=1, max=6),
+            AnalogSetting("Stick_D", max=64),
+            AnalogSetting("Gier_P", min=1, max=20),
+            AnalogSetting("Gas_Min", max=32),
+            AnalogSetting("Gas_Max", min=33),
+            AnalogSetting("GyroAccFaktor", min=1, max=64),
+            AnalogPotiSetting("KompassWirkung", max=32),
+            AnalogPotiSetting("Gyro_P", min=10),
+            AnalogPotiSetting("Gyro_I"),
+            AnalogPotiSetting("Gyro_D"),
+            AnalogPotiSetting("Gyro_Gier_P", min=10),
+            AnalogPotiSetting("Gyro_Gier_I")
+        ]
+        if version >= 84:
+            list += [ AnalogSetting("Gyro_Stability", max=16) ]
+        list += [
+            AnalogSetting("UnterspannungsWarnung"),
+            AnalogSetting("NotGas"),      # Gaswert bei Empängsverlust
+            AnalogSetting("NotGasZeit"),  # Zeitbis auf NotGas geschaltet wird, wg. Rx-Problemen
+            ChoiceSetting("Receiver", {
+                0: "PPM", 1: "SPEKTRUM", 2: "SPEKTRUM_HI_RES", 3: "SPEKTRUM_LO_RES",
+                4: "JETI", 5: "ACT_DSL"
+            }),
+            AnalogPotiSetting("I_Faktor"),
+            AnalogPotiSetting("UserParam1"),
+            AnalogPotiSetting("UserParam2"),
+            AnalogPotiSetting("UserParam3"),
+            AnalogPotiSetting("UserParam4"),
+            AnalogPotiSetting("ServoNickControl"), # Stellung des Servos
+            AnalogSetting("ServoNickComp"),        # Einfluss Gyro/Servo
+            AnalogSetting("ServoNickMin"),
+            AnalogSetting("ServoNickMax"),
+            AnalogPotiSetting("ServoRollControl"), # Stellung des Servos
+            AnalogSetting("ServoRollComp"),
+            AnalogSetting("ServoRollMin"),
+            AnalogSetting("ServoRollMax"),
+            AnalogSetting("ServoNickRefresh")      # Speed of the Servo
+        ]
+        if version >= 85:
+            list += [
+                AnalogSetting("ServoManualControlSpeed"),
+                AnalogSetting("CamOrientation")
+            ]
+        list += [
+            AnalogPotiSetting("Servo3"),   # Value or mapping of the Servo Output
+            AnalogPotiSetting("Servo4"),   # Value or mapping of the Servo Output
+            AnalogPotiSetting("Servo5"),   # Value or mapping of the Servo Output
+            AnalogPotiSetting("LoopGasLimit"),     # max. Gas während Looping
+            AnalogSetting("LoopThreshold"),        # Schwelle für Stickausschlag
+            AnalogSetting("LoopHysterese"),        # Hysterese für Stickausschlag
+            AnalogPotiSetting("AchsKopplung1"),    # Faktor, mit dem Gier die Achsen Roll und Nick koppelt (NickRollMitkopplung)
+            AnalogPotiSetting("AchsKopplung2"),           # Faktor, mit dem Nick und Roll verkoppelt werden
+            AnalogPotiSetting("CouplingYawCorrection"),   # Faktor, mit dem Nick und Roll verkoppelt werden
+            AnalogSetting("WinkelUmschlagNick"),   # 180°-Punkt
+            AnalogSetting("WinkelUmschlagRoll"),   # 180°-Punkt
+            AnalogSetting("GyroAccAbgleich"),      # 1/k  (Koppel_ACC_Wirkung)
+            AnalogSetting("Driftkomp"),
+            AnalogPotiSetting("DynamicStability"),
+            AnalogPotiSetting("UserParam5"),
+            AnalogPotiSetting("UserParam6"),
+            AnalogPotiSetting("UserParam7"),
+            AnalogPotiSetting("UserParam8"),
+            BinarySetting("J16Bitmask"),
+            AnalogPotiSetting("J16Timing"),
+            BinarySetting("J17Bitmask"),
+            AnalogPotiSetting("J17Timing"),
+            BinarySetting("WARN_J16_Bitmask"),
+            BinarySetting("WARN_J17_Bitmask"),
+            AnalogPotiSetting("NaviGpsModeControl"),   # Parameters for the Naviboard
+            AnalogPotiSetting("NaviGpsGain"),
+            AnalogPotiSetting("NaviGpsP"),
+            AnalogPotiSetting("NaviGpsI"),
+            AnalogPotiSetting("NaviGpsD"),
+            AnalogSetting("NaviGpsPLimit"),
+            AnalogSetting("NaviGpsILimit"),
+            AnalogSetting("NaviGpsDLimit"),
+            AnalogPotiSetting("NaviGpsACC"),
+            AnalogSetting("NaviGpsMinSat"),
+            AnalogSetting("NaviStickThreshold"),
+            AnalogPotiSetting("NaviWindCorrection"),
+            AnalogPotiSetting("NaviSpeedCompensation"),
+            AnalogPotiSetting("NaviOperatingRadius"),
+            AnalogPotiSetting("NaviAngleLimitation"),
+            AnalogSetting("NaviPH_LoginTime"),
+            AnalogPotiSetting("ExternalControl")   # for serial Control
+        ]
+        if version >= 84:
+            list += [
+                 AnalogSetting("OrientationAngle"), # Where is the front-direction?
+                 AnalogPotiSetting("OrientationModeControl") # switch for CareFree
+            ]
+        if version >= 85:
+            list += [
+                 AnalogSetting("MotorSafetySwitch", max=15)
+            ]
+        list += [
+            BinarySetting("BitConfig"), # LabeledSetting("BitConfig", ["LOOP_OBEN", "LOOP_UNTEN", "LOOP_LINKS", "LOOP_RECHTS", "MOTOR_BLINK", "MOTOR_OFF_LED1", "MOTOR_OFF_LED2"])
+            BinarySetting("ServoCompInvert"),      # 0x01 = Nick, 0x02 = Roll
+            BinarySetting("ExtraConfig"),          # LabeledSetting("ExtraConfig", ["HEIGHT_LIMIT", "VARIO_BEEP", "SENSITIVE_RC", "3_3V_REFERENCE"])
+            StringSetting("Name", 12)
+        ]
+        return list
 
 def calc_crc(data):
     counter = ord('#')
@@ -282,21 +442,18 @@ class CmdGetSettings(Command):
     def parse_reply(self, reply):
         set, version = struct.unpack("2B", reply[0:2])
         reply = reply[2:]
-        setting = {}
-        for name in settings:
-            setting[name], = struct.unpack('B', reply[0])
-            reply = reply[1:]
-        return set, version, setting
+        config = Configuration(version)
+        config.unpack( reply )
+        return set, version, config
 
 class CmdSetSettings(Command):
     """
     Write a new configuration.
     Parameters are the same as the reply of CmdGetSettings
     """
-    def __init__(self, board, set, version, setting):
+    def __init__(self, board, set, version, config):
         data = struct.pack("2B", set, version)
-        for name in settings:
-            data += struct.pack("B", setting[name])
+        data += config.pack()
         Command.__init__(self, board, 's', 'S', data)
 
     def parse_reply(self, reply):
