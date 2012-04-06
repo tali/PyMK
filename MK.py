@@ -36,9 +36,14 @@ class AnalogSetting(Setting):
         self.max = max
 
     def assign(self, value):
-        if value < self.min: raise ValueError( "too low" )
-        if value > self.max: raise ValueError( "too high" )
-        self.value = int(value)
+        value = int(value)
+        if value < self.min: raise ValueError(
+                "invalid value for %s: %d is lower than the limit (%d)!" % (
+                    self.name, value, self.min) )
+        if value > self.max: raise ValueError(
+                "invalid value for %s: %d is higher than the limit (%d)!" % (
+                    self.name, value, self.max) )
+        self.value = value
 
 class AnalogPotiSetting(AnalogSetting):
     def assign(self, value):
