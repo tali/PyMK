@@ -231,6 +231,8 @@ if options.flash_software:
     filename = os.path.basename( options.flash_software )
     binary = IntelHex( options.flash_software )
     binary.readfile()
+    print "image", binary.minaddr(), binary.maxaddr()
+
     boardName, cpuName, rest = filename.split('_', 2)
     board = get_board( boardName )
     print "entering bootloader of", board.name,
@@ -359,6 +361,17 @@ if options.flash_software:
 
 #    # TODO: for NC: set size which has to be erased
 #    print "clearing flash",
+##     if NC:
+##         data = struct.pack('!I', binary.maxaddr())
+##         data[0] = 'X'
+##         mk.send_data(data, 0)
+#        data = mk.recv_data(1, 10)
+#        if mk.debug:
+#            for c in data: print hex(ord(c)),
+#        if data != chr(0x0d):
+#            mk.send_data( 'E', 0)
+#            print "could not clear flash"
+#            sys.exit(1)
 #    mk.send_data('e', 0)
 #    data = mk.recv_data(1, 10)
 #    if mk.debug:
@@ -410,6 +423,11 @@ if options.flash_software:
         print "could not set target address"
         sys.exit(1)
     ok = True
+    data = mk.recv_data(10, 1)
+    if data and mk.debug:
+        print "extra bytes: ",
+        for c in received: print hex(ord(c)),
+        print ""
     while offset <= end:
         print "verifying", offset, "\r",
         sys.stdout.flush()
