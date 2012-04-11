@@ -1,0 +1,16 @@
+Python Tools for MikroKopter
+----------------------------
+
+At mikrokopter.de you can order very nice flying computers.
+As I don't use Windows, I could not use the official tool to configure
+them, so I wrote my own.  You are currently looking at my little pet
+project, which is able to configure and monitor MikroKopters on
+all platforms supporting Python.  It is not very polished and only offers
+basic features, but it can already be used.
+
+All this is can be used freely (BSD license), see LICENSE for details.
+You are welcome to contribute by suggesting new features, reporting bugs,
+and submitting patches.
+
+
+Author: Martin Waitz <tali@admingilde.org>
