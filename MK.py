@@ -142,7 +142,7 @@ class Configuration(object):
     @classmethod
     def settings(cls, version):
         if version < 82: raise ValueError("unsupported version")
-        if version > 85: raise ValueError("unsupported version")
+        if version > 90: raise ValueError("unsupported version")
         list = [
             AnalogSetting("Channel_Gas", max=15),
             AnalogSetting("Channel_Gier", max=15),
@@ -164,7 +164,7 @@ class Configuration(object):
             AnalogSetting("Hoehe_StickNeutralPoint"),
             AnalogSetting("Stick_P", min=1, max=6),
             AnalogSetting("Stick_D", max=64),
-            AnalogSetting("Gier_P", min=1, max=20),
+            AnalogSetting("StickGier_P", min=1, max=20),
             AnalogSetting("Gas_Min", max=32),
             AnalogSetting("Gas_Max", min=33),
             AnalogSetting("GyroAccFaktor", min=1, max=64),
@@ -183,7 +183,7 @@ class Configuration(object):
             AnalogSetting("NotGasZeit"),  # Zeitbis auf NotGas geschaltet wird, wg. Rx-Problemen
             ChoiceSetting("Receiver", {
                 0: "PPM", 1: "SPEKTRUM", 2: "SPEKTRUM_HI_RES", 3: "SPEKTRUM_LO_RES",
-                4: "JETI", 5: "ACT_DSL"
+                4: "JETI", 5: "ACT_DSL", 6: "HOTT", 7: "SBUS", 8: "USER"
             }),
             AnalogPotiSetting("I_Faktor"),
             AnalogPotiSetting("UserParam1"),
@@ -242,7 +242,12 @@ class Configuration(object):
             AnalogSetting("NaviGpsMinSat"),
             AnalogSetting("NaviStickThreshold"),
             AnalogPotiSetting("NaviWindCorrection"),
-            AnalogPotiSetting("NaviSpeedCompensation"),
+        ]
+        if version >= 88:
+            list += [ AnalogPotiSetting("NaviSpeedCompensation") ]
+        else:
+            list += [ AnalogPotiSetting("NaviAccCompensation") ]
+        list += [
             AnalogPotiSetting("NaviOperatingRadius"),
             AnalogPotiSetting("NaviAngleLimitation"),
             AnalogSetting("NaviPH_LoginTime"),
@@ -251,16 +256,35 @@ class Configuration(object):
         if version >= 84:
             list += [
                  AnalogSetting("OrientationAngle"), # Where is the front-direction?
-                 AnalogPotiSetting("OrientationModeControl") # switch for CareFree
+                 AnalogPotiSetting("CareFreeModeControl") # switch for CareFree
             ]
         if version >= 85:
             list += [
                  AnalogSetting("MotorSafetySwitch", max=15)
             ]
+        if version >= 88:
+            list += [
+                 AnalogSetting("MotorSmooth"),
+                 AnalogSetting("ComingHomeAltitude"),
+                 AnalogSetting("FailSafeTime"),
+                 AnalogSetting("MaxAltitude")
+            ]
+        if version >= 90:
+            list += [
+                 AnalogSetting("FailsafeChannelA"), # if the value of this channel is > 100, the MK reports "RC-Lost"
+                 AnalogSetting("ServoFilterNick"),
+                 AnalogSetting("ServoFilterRoll")
+            ]
         list += [
-            BinarySetting("BitConfig"), # LabeledSetting("BitConfig", ["LOOP_OBEN", "LOOP_UNTEN", "LOOP_LINKS", "LOOP_RECHTS", "MOTOR_BLINK", "MOTOR_OFF_LED1", "MOTOR_OFF_LED2"])
+            BinarySetting("BitConfig"), # LabeledSetting("BitConfig", ["LOOP_OBEN", "LOOP_UNTEN", "LOOP_LINKS", "LOOP_RECHTS", "MOTOR_BLINK1", "MOTOR_OFF_LED1", "MOTOR_OFF_LED2", "MOTOR_BLINK2"])
             BinarySetting("ServoCompInvert"),      # 0x01 = Nick, 0x02 = Roll
-            BinarySetting("ExtraConfig"),          # LabeledSetting("ExtraConfig", ["HEIGHT_LIMIT", "VARIO_BEEP", "SENSITIVE_RC", "3_3V_REFERENCE"])
+            BinarySetting("ExtraConfig"),          # LabeledSetting("ExtraConfig", ["HEIGHT_LIMIT", "VARIO_BEEP", "SENSITIVE_RC", "3_3V_REFERENCE", "NO_RCOFF_BEEPING", "GPS_AID", "LEARNABLE_CAREFREE", "IGNORE_MAG_ERR_AT_STARTUP"])
+        ]
+        if version >= 90:
+            list += [
+                 BinarySetting("GlobalConfig3")    # LabeledSetting("GlobalConfig3", ["NO_SDCARD_NO_START", "DPH_MAX_RADIUS", "VARIO_FAILSAFE")
+            ]
+        list += [
             StringSetting("Name", 12)
         ]
         return list
