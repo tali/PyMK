@@ -8,9 +8,14 @@ project, which is able to configure and monitor MikroKopters on
 all platforms supporting Python.  It is not very polished and only offers
 basic features, but it can already be used.
 
-All this is can be used freely (BSD license), see LICENSE for details.
+All this can be used freely (BSD license), see LICENSE for details.
 You are welcome to contribute by suggesting new features, reporting bugs,
 and submitting patches.
+
+
+The functionality to communicate with your Mikrokopter is provided by MK.py.
+There is a very simple monitor program named `km` which provides a
+command line interface, see `km --help` for some supported commands.
 
 
 Author: Martin Waitz <tali@admingilde.org>
