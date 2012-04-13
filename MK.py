@@ -123,10 +123,10 @@ class Configuration(object):
         self.setting[key].assign(value)
 
     def value(self, key):
-        self.setting[key].value
+        return self.setting[key].value
 
     def get(self, key):
-        str( self.setting[key] )
+        return str( self.setting[key] )
 
     def pack(self):
         data = ""
