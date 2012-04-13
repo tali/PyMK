@@ -473,15 +473,15 @@ class CmdGetSettings(Command):
         reply = reply[2:]
         config = Configuration(version)
         config.unpack( reply )
-        return set, version, config
+        return set, config
 
 class CmdSetSettings(Command):
     """
     Write a new configuration.
     Parameters are the same as the reply of CmdGetSettings
     """
-    def __init__(self, board, set, version, config):
-        data = struct.pack("2B", set, version)
+    def __init__(self, board, set, config):
+        data = struct.pack("2B", set, config.version)
         data += config.pack()
         Command.__init__(self, board, 's', 'S', data)
 

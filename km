@@ -125,23 +125,23 @@ if options.show_settings:
     else:
         index = int(options.show_settings)
     cmd = CmdGetSettings(mk.fc, index)
-    set, version, config = mk.send_cmd(cmd)
-    print "settings", set, "version", version, '"' + config.name + '"'
+    set, config = mk.send_cmd(cmd)
+    print "settings", set, "version", config.version, '"' + config.name + '"'
     for name, setting in config.setting.iteritems():
         print "%30s: %s" % (name, str(setting))
 
 if options.get:
     key = options.get
     cmd = CmdGetSettings(mk.fc, 0xff)
-    set, version, config = mk.send_cmd(cmd)
+    set, config = mk.send_cmd(cmd)
     print config.get(key)
 
 if options.set:
     key, value = options.set.split('=')
     cmd = CmdGetSettings(mk.fc, 0xff)
-    set, version, config = mk.send_cmd(cmd)
+    set, config = mk.send_cmd(cmd)
     config.set(key, value)
-    cmd = CmdSetSettings(mk.fc, set, version, config)
+    cmd = CmdSetSettings(mk.fc, set, config)
     status = mk.send_cmd(cmd)
     if status != set:
         print "cannot set %s to %d (setting %d)" % (key, value, set)
